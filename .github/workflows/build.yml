@@ -1,0 +1,53 @@
+name: Build Android APK
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android
+
+      - name: Build APK (Release)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+        # Note: This will fail if no Release Keystore is configured.
+        # Fallback to Debug if Release fails logic is hard here. 
+        # Let's try assembleDebug to be safe and immediate.
+        continue-on-error: true
+      
+      - name: Build APK (Debug Fallback)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/debug/*.apk

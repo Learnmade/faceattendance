@@ -1,0 +1,19 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+
+🟢 Greenleaf Backend Running on port 5000
+------------------------------------------------
+Local via Emulator:   http://10.0.2.2:5000
+Local via LAN:        http://192.168.31.67:5000
+------------------------------------------------
+
+DB Error: MongooseError: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+    at NativeConnection.createClient (C:\Users\jeyas\OneDrive\Desktop\projects\face-attendance\backend\node_modules\mongoose\lib\drivers\node-mongodb-native\connection.js:230:11)
+    at NativeConnection.openUri (C:\Users\jeyas\OneDrive\Desktop\projects\face-attendance\backend\node_modules\mongoose\lib\connection.js:1075:34)
+    at Mongoose.connect (C:\Users\jeyas\OneDrive\Desktop\projects\face-attendance\backend\node_modules\mongoose\lib\mongoose.js:451:15)
+    at Object.<anonymous> (C:\Users\jeyas\OneDrive\Desktop\projects\face-attendance\backend\index.js:15:10)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Object..js (node:internal/modules/cjs/loader:1839:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
