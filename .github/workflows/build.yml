@@ -8,6 +8,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # This action clears about 30GB of space
+          tool-cache: true
+          android: false # Don't remove Android tools as we need them
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
@@ -33,9 +45,6 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease
-        # Note: This will fail if no Release Keystore is configured.
-        # Fallback to Debug if Release fails logic is hard here. 
-        # Let's try assembleDebug to be safe and immediate.
         continue-on-error: true
       
       - name: Build APK (Debug Fallback)
@@ -51,3 +60,4 @@ jobs:
           path: |
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
+
