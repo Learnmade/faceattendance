@@ -97,39 +97,45 @@ export const api = {
 
     // 1. REGISTER EMPLOYEE
     register: async (userData) => {
-        if (IS_OFFLINE) {
-            await delay(1000);
+        const hasOfflineUsers = await AsyncStorage.getItem(USERS_KEY);
+
+        // Helper to save locally
+        const saveLocally = async (data) => {
             const usersRaw = await AsyncStorage.getItem(USERS_KEY);
             const users = usersRaw ? JSON.parse(usersRaw) : [];
+            // Prevent duplicates
+            if (users.find(u => u.employeeId === data.employeeId)) return { success: false, message: "ID already exists (Offline)" };
 
-            if (users.find(u => u.employeeId === userData.employeeId)) {
-                return { success: false, message: "ID already exists" };
-            }
-
-            users.push({ ...userData, createdAt: new Date() });
+            users.push({ ...data, createdAt: new Date() });
             await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-            return { success: true, message: "Saved locally" };
+            return { success: true, message: "Saved locally (Offline - Sync later)" };
+        };
+
+        if (IS_OFFLINE) {
+            await delay(1000);
+            return await saveLocally(userData);
         } else {
             try {
+                // 5s Timeout for mobile networks
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
                 const response = await fetch(`${API_URL}/api/employees`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userData)
+                    body: JSON.stringify(userData),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server Error: ${response.status} - ${errorText}`);
+                }
                 return await response.json();
             } catch (err) {
-                console.warn("Backend Unreachable, saving locally:", err.message);
-                // Fallback Logic
-                await delay(500);
-                const usersRaw = await AsyncStorage.getItem(USERS_KEY);
-                const users = usersRaw ? JSON.parse(usersRaw) : [];
-
-                // Don't duplicate
-                if (users.find(u => u.employeeId === userData.employeeId)) return { success: true };
-
-                users.push({ ...userData, createdAt: new Date() });
-                await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-                return { success: true, message: "Saved locally (Offline)" };
+                console.warn(`⚠️ Online Register Failed (${err.message}). Falling back to Offline Storage.`);
+                return await saveLocally(userData);
             }
         }
     },
