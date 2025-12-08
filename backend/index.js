@@ -72,32 +72,28 @@ app.post('/api/login', async (req, res) => {
             if (!password) {
                 return res.status(401).json({ success: false, message: "Password required for Admin" });
             }
-
-            // Check if password matches hash
             try {
                 const isMatch = await bcrypt.compare(password, user.password);
                 if (!isMatch) {
                     return res.status(401).json({ success: false, message: "Invalid credentials" });
                 }
             } catch (bcryptError) {
-                // Determine if legacy plain text
                 if (user.password === password) {
-                    console.warn("Legacy plain text password detected. Updating to hash...");
+                    console.warn("Legacy plain text password detected for Admin. Updating to hash...");
                     user.password = await bcrypt.hash(password, 10);
                     await user.save();
                 } else {
-                    console.error("Bcrypt Error:", bcryptError);
-                    return res.status(500).json({ success: false, message: "Security Error during verification" });
+                    return res.status(500).json({ success: false, message: "Security Error" });
                 }
             }
-        } else {
-            // Optional: Employees might have passwords too in future.
-            if (user.password && password) {
-                const isMatch = await bcrypt.compare(password, user.password);
-                if (!isMatch) {
-                    return res.status(401).json({ success: false, message: "Invalid password" });
-                }
-            }
+        }
+
+        // Update Last Login (Best Effort)
+        try {
+            user.lastLogin = new Date();
+            await user.save();
+        } catch (saveError) {
+            console.warn("Could not update lastLogin:", saveError.message);
         }
 
         res.json({
@@ -105,7 +101,8 @@ app.post('/api/login', async (req, res) => {
             user: {
                 name: user.name,
                 id: user.employeeId,
-                role: user.role || 'user'
+                role: user.role || 'user',
+                department: user.department
             }
         });
     } catch (e) {
@@ -173,6 +170,7 @@ app.post('/api/employees', async (req, res) => {
             password: hashedPassword
         });
         await newUser.save();
+        console.log(`✅ [MongoDB] New Employee Registered: ${name} (${employeeId})`);
 
         // 2. Save to Google Sheets (Employees Tab)
         // Note: Google Sheets Logic should ideally be separated or error handled gracefully
@@ -327,53 +325,4 @@ function getLocalIp() {
 }
 
 // 0. Login Endpoint Update to track Last Login
-app.post('/api/login', async (req, res) => {
-    const { employeeId, password } = req.body;
-    try {
-        const user = await User.findOne({ employeeId });
-        if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-        // Admin Security Check
-        if (user.role === 'admin') {
-            if (!password) {
-                return res.status(401).json({ success: false, message: "Password required for Admin" });
-            }
-            try {
-                const isMatch = await bcrypt.compare(password, user.password);
-                if (!isMatch) {
-                    return res.status(401).json({ success: false, message: "Invalid credentials" });
-                }
-            } catch (bcryptError) {
-                if (user.password === password) {
-                    console.warn("Legacy plain text password detected. Updating to hash...");
-                    user.password = await bcrypt.hash(password, 10);
-                    await user.save();
-                } else {
-                    return res.status(500).json({ success: false, message: "Security Error" });
-                }
-            }
-        }
-
-        // Update Last Login (Best Effort)
-        try {
-            user.lastLogin = new Date();
-            await user.save();
-        } catch (saveError) {
-            console.warn("Could not update lastLogin:", saveError.message);
-            // Proceed anyway, don't block login
-        }
-
-        res.json({
-            success: true,
-            user: {
-                name: user.name,
-                id: user.employeeId,
-                role: user.role || 'user',
-                department: user.department
-            }
-        });
-    } catch (e) {
-        console.error("Login Server Error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
+// 0. Login Endpoint moved to top
