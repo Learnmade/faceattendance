@@ -310,15 +310,28 @@ if (require.main === module) {
 app.get('/api/health', (req, res) => {
     const dbState = mongoose.connection.readyState;
     const statusMap = {
-        for(const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-        if (iface.family === 'IPv4' && !iface.internal) {
-            return iface.address;
+        0: 'Disconnected',
+        1: 'Connected',
+        2: 'Connecting',
+        3: 'Disconnecting',
+    };
+    res.json({
+        status: dbState === 1 ? 'OK' : 'Error',
+        message: 'Greenleaf Server is Online',
+        database: statusMap[dbState] || 'Unknown',
+        timestamp: new Date()
+    });
+});
+
+// Helper to get Local IP
+function getLocalIp() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
         }
     }
+    return 'localhost';
 }
-return 'localhost';
-}
-
-// 0. Login Endpoint Update to track Last Login
-// 0. Login Endpoint moved to top
