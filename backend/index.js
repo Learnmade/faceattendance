@@ -306,9 +306,21 @@ if (require.main === module) {
 }
 
 // Routes Additions
-// Health Check for App to Verify Connection
+// Health Check for App to Verify Connection & DB Status
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'OK', message: 'Greenleaf Server is Online', timestamp: new Date() });
+    const dbState = mongoose.connection.readyState;
+    const statusMap = {
+        0: 'Disconnected',
+        1: 'Connected',
+        2: 'Connecting',
+        3: 'Disconnecting',
+    };
+    res.json({
+        status: dbState === 1 ? 'OK' : 'Error',
+        message: 'Greenleaf Server is Online',
+        database: statusMap[dbState] || 'Unknown',
+        timestamp: new Date()
+    });
 });
 
 // Helper to get Local IP
