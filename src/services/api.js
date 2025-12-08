@@ -58,13 +58,40 @@ export const api = {
                 }
             };
         } else {
-            // Real Backend Call
-            const response = await fetch(`${API_URL}/api/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employeeId, password })
-            });
-            return await response.json();
+            // Real Backend Call with Offline Fallback
+            try {
+                // Add Timeout to fail fast
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 sec timeout
+
+                const response = await fetch(`${API_URL}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ employeeId, password }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                return await response.json();
+            } catch (err) {
+                console.warn("Backend Unreachable, falling back to Offline Mode:", err.message);
+                // --- FALLBACK LOGIC DUPLICATED FROM ABOVE ---
+                // Re-run the offline logic
+                await delay(800);
+                if (employeeId === SEED_ADMIN.employeeId && password === SEED_ADMIN.password) {
+                    return { success: true, user: { ...SEED_ADMIN, id: SEED_ADMIN.employeeId } };
+                }
+                const usersRaw = await AsyncStorage.getItem(USERS_KEY);
+                const users = usersRaw ? JSON.parse(usersRaw) : [];
+                const user = users.find(u => u.employeeId === employeeId);
+                if (!user) return { success: false, message: "User not found (Offline)" };
+                if (user.role === 'admin') {
+                    if (user.password !== password) return { success: false, message: "Invalid credentials" };
+                }
+                return {
+                    success: true,
+                    user: { name: user.name, id: user.employeeId, role: user.role, department: user.department }
+                };
+            }
         }
     },
 
@@ -83,12 +110,27 @@ export const api = {
             await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
             return { success: true, message: "Saved locally" };
         } else {
-            const response = await fetch(`${API_URL}/api/employees`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(userData)
-            });
-            return await response.json();
+            try {
+                const response = await fetch(`${API_URL}/api/employees`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                return await response.json();
+            } catch (err) {
+                console.warn("Backend Unreachable, saving locally:", err.message);
+                // Fallback Logic
+                await delay(500);
+                const usersRaw = await AsyncStorage.getItem(USERS_KEY);
+                const users = usersRaw ? JSON.parse(usersRaw) : [];
+
+                // Don't duplicate
+                if (users.find(u => u.employeeId === userData.employeeId)) return { success: true };
+
+                users.push({ ...userData, createdAt: new Date() });
+                await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
+                return { success: true, message: "Saved locally (Offline)" };
+            }
         }
     },
 
@@ -109,12 +151,30 @@ export const api = {
             await AsyncStorage.setItem(ATTENDANCE_KEY, JSON.stringify(logs));
             return { success: true, shift: 'Day' }; // Mock shift
         } else {
-            const response = await fetch(`${API_URL}/api/attendance`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(logData)
-            });
-            return await response.json();
+            try {
+                const response = await fetch(`${API_URL}/api/attendance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logData)
+                });
+                return await response.json();
+            } catch (err) {
+                console.warn("Backend Unreachable, logging locally:", err.message);
+                // Fallback Logic
+                await delay(600);
+                const logsRaw = await AsyncStorage.getItem(ATTENDANCE_KEY);
+                const logs = logsRaw ? JSON.parse(logsRaw) : [];
+
+                const newLog = {
+                    ...logData,
+                    timestamp: new Date().toISOString(),
+                    savedAt: new Date().toISOString()
+                };
+                logs.push(newLog);
+
+                await AsyncStorage.setItem(ATTENDANCE_KEY, JSON.stringify(logs));
+                return { success: true, shift: 'Day (Offline)' };
+            }
         }
     },
 
@@ -150,8 +210,31 @@ export const api = {
                 recent
             };
         } else {
-            const response = await fetch(`${API_URL}/api/status/${employeeId}`);
-            return await response.json();
+            try {
+                const response = await fetch(`${API_URL}/api/status/${employeeId}`);
+                return await response.json();
+            } catch (err) {
+                console.warn("Backend Unreachable, checking local logs:", err.message);
+                // Fallback Logic
+                await delay(500);
+                const logsRaw = await AsyncStorage.getItem(ATTENDANCE_KEY);
+                const logs = logsRaw ? JSON.parse(logsRaw) : [];
+
+                const userLogs = logs.filter(l => l.employeeId === employeeId);
+                const lastLog = userLogs[userLogs.length - 1];
+                let status = 'Checked Out';
+                if (lastLog && lastLog.type === 'Check In') status = 'Checked In';
+
+                return {
+                    status,
+                    lastLog: lastLog ? {
+                        date: new Date(lastLog.timestamp).toLocaleDateString(),
+                        time: new Date(lastLog.timestamp).toLocaleTimeString(),
+                        type: lastLog.type
+                    } : null,
+                    recent: [] // offline recent logs difficult to format same way quickly
+                };
+            }
         }
     }
 };
