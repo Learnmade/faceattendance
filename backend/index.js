@@ -13,45 +13,45 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, { dbName: 'face-attendance' })
-    .then(async () => {
-        console.log('✅ MongoDB Connected to: face-attendance');
-        // Initialize a dummy user if none exists
-        const count = await User.countDocuments();
-        if (count === 0) {
-            await User.create({
-                employeeId: 'EMP001',
-                name: 'John Doe',
-                department: 'IT',
-                faceData: 'mock-face-data'
-            });
-            console.log("Mock user created");
-        }
+// MongoDB Connection Utility for Serverless
+let cachedDb = null;
 
-        // Ensure Greenleaf Admin exists and has HASHED password
-        const adminUser = await User.findOne({ employeeId: 'greenleaf' });
-        const hashedPassword = await bcrypt.hash('greenleaf@admin', 10);
+async function connectToDatabase() {
+    if (mongoose.connection.readyState === 1) {
+        return;
+    }
+    try {
+        console.log("🔄 Connecting to MongoDB (Face Attendance)...");
+        await mongoose.connect(process.env.MONGO_URI, {
+            dbName: 'face-attendance',
+            serverSelectionTimeoutMS: 5000
+        });
+        cachedDb = mongoose.connection;
+        console.log("✅ New MongoDB Connection Established");
+    } catch (error) {
+        console.error("❌ MongoDB Connection Creation Failed:", error);
+        throw error;
+    }
+}
 
-        if (!adminUser) {
-            await User.create({
-                employeeId: 'greenleaf',
-                name: 'Greenleaf Admin',
-                password: hashedPassword,
-                role: 'admin',
-                department: 'Management',
-                faceData: 'admin-placeholder', // Satisfy required field
-                status: 'Active'
-            });
-            console.log("Admin user 'greenleaf' created.");
-        } else {
-            // Self-healing: Update password and ensure valid faceData to prevent Save errors
-            adminUser.password = hashedPassword;
-            if (!adminUser.faceData) adminUser.faceData = 'admin-placeholder';
-            await adminUser.save();
-            console.log("Admin user 'greenleaf' updated.");
+// Middleware to ensure DB is connected before every request
+app.use(async (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        try {
+            await connectToDatabase();
+            next();
+        } catch (error) {
+            console.error("Database Middleware Error:", error);
+            res.status(500).json({ error: 'Database Connection Failed', details: error.message });
         }
-    })
-    .catch(err => console.log('DB Error:', err));
+    } else {
+        next();
+    }
+});
+
+app.get('/api/version', (req, res) => {
+    res.json({ version: '2.0.0 - Production Optimized', db: 'face-attendance', time: new Date() });
+});
 
 // ... Google Sheets Setup ...
 // (Assume setup is here or imported from similar config)
