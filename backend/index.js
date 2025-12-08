@@ -15,7 +15,7 @@ app.use(bodyParser.json({ limit: '50mb' }));
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, { dbName: 'face-attendance' })
     .then(async () => {
-        console.log('MongoDB Connected');
+        console.log('✅ MongoDB Connected to: face-attendance');
         // Initialize a dummy user if none exists
         const count = await User.countDocuments();
         if (count === 0) {
