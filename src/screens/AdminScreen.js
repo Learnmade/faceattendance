@@ -36,7 +36,8 @@ export default function AdminScreen({ onBack, onLaunchKiosk }) {
             });
 
             if (result.success) {
-                Alert.alert("Success", "Employee Registered Successfully!");
+                // Show the actual message (Online vs Offline)
+                Alert.alert("Success", result.message || "Employee Registered Successfully!");
                 setName('');
                 setEmployeeId('');
                 setDepartment('');
