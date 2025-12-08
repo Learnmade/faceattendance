@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import './global.css';
 import AttendanceScreen from './src/screens/AttendanceScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import { getUserSession, saveUserSession, clearUserSession } from './src/utils/authService';
