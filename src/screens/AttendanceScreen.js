@@ -32,6 +32,8 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
     const [searchId, setSearchId] = useState(''); // Kiosk Search
     const cameraRef = useRef(null);
 
+    const [successMessage, setSuccessMessage] = useState(null); // Feedback Modal
+
     // Live Clock
     const [currentTime, setCurrentTime] = useState(new Date());
     useEffect(() => {
@@ -75,12 +77,7 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
             try {
                 setLoading(true);
                 const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
-
-                // For this Offline/Demo build, we skip complex face detection to ensure success
-                // In real app, FaceDetector logic remains.
-
-                // 2. Identify User
-                let verifiedUser = user;
+                const faces = await FaceDetector.detectFaces(photo.uri);
 
                 if (faces.faces.length > 0) {
                     // 2. Identify User
@@ -96,11 +93,8 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
 
                         // Verify user exists in DB
                         try {
-                            // Correctly check status to ensure user exists
                             const identity = await api.getStatus(searchId);
                             if (!identity || identity.error) throw new Error("ID not found on Server");
-
-                            // Verified visually by camera presence + valid ID
                             verifiedUser = { name: 'Verified Employee', id: searchId, ...identity };
                         } catch (err) {
                             throw new Error("Invalid Employee ID: " + searchId);
@@ -113,12 +107,7 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
                     setSearchId(''); // Clear ID for next person
                     if (!isKiosk) fetchDashboard();
                 } else {
-                    // Face not found
-                    // throw new Error("No face detected. Please position your face in the frame.");
-                    // But maybe we want to allow it for weak cameras? 
-                    // No, "Face Verification" is the point. 
-                    // Let's rely on SafeFaceDetector result.
-                    Alert.alert("No Face Detected", "Please ensure your face is clearly visible in the circle.");
+                    Alert.alert("No Face Detected", "Please ensure your face is clearly visible.");
                 }
             } catch (e) {
                 console.error(e);
@@ -136,7 +125,7 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
             const result = await api.logAttendance({
                 date: formatDate(now),
                 time: formatTime(now),
-                name: verifiedUser.name,
+                name: verifiedUser.name || verifiedUser.id,
                 employeeId: verifiedUser.id,
                 type: type,
                 shift: shift,
@@ -144,7 +133,13 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
             });
 
             if (result.success) {
-                Alert.alert("Verified", `User Verified Successfully!\n${type} Marked.`);
+                // Show Success Modal instead of Alert
+                setSuccessMessage(`${verifiedUser.id} - ${type} Successful`);
+
+                // Auto Hide after 2.5s
+                setTimeout(() => {
+                    setSuccessMessage(null);
+                }, 2500);
             } else {
                 throw new Error("Server rejected log.");
             }
@@ -250,6 +245,17 @@ export default function AttendanceScreen({ user, onLogout, isKiosk }) {
                     <View className="h-10" />
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Success Feedback Modal (Production Polish) */}
+            <Modal visible={!!successMessage} transparent animationType="fade">
+                <View className="flex-1 bg-green-600 justify-center items-center">
+                    <View className="bg-white p-8 rounded-full mb-6 shadow-2xl">
+                        <Text className="text-6xl">✓</Text>
+                    </View>
+                    <Text className="text-white text-3xl font-bold mb-2 tracking-tight">Verified!</Text>
+                    <Text className="text-green-100 text-lg font-medium">{successMessage}</Text>
+                </View>
+            </Modal>
 
             {/* Camera Modal */}
             <Modal visible={cameraVisible} animationType="slide" presentationStyle="pageSheet">
