@@ -13,7 +13,7 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, { dbName: 'face-attendance' })
     .then(async () => {
         console.log('MongoDB Connected');
         // Initialize a dummy user if none exists
