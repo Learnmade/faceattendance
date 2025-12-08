@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import './global.css';
 import AttendanceScreen from './src/screens/AttendanceScreen';
+import AdminScreen from './src/screens/AdminScreen'; // Static Import
 import LoginScreen from './src/screens/LoginScreen';
 import { getUserSession, saveUserSession, clearUserSession } from './src/utils/authService';
 
@@ -29,7 +29,6 @@ export default function App() {
     } catch (e) {
       console.log("Session check failed", e);
     } finally {
-      // Always stop loading
       setLoading(false);
     }
   };
@@ -46,23 +45,22 @@ export default function App() {
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center">
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F4F6' }}>
         <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={{ marginTop: 20, color: '#4B5563' }}>Starting...</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <View className="flex-1 bg-gray-100">
+      <View style={{ flex: 1 }} className="bg-gray-100">
         <StatusBar style="dark" />
         {user ? (
           user.role === 'admin' ? (
-            // Admin Flow
-            // Admin Flow
             <AdminFlow user={user} onLogout={handleLogout} />
           ) : (
-            // Regular User Flow (if needed)
+            // Fallback for non-admin users if ever created
             <AttendanceScreen user={user} onLogout={handleLogout} />
           )
         ) : (
@@ -76,13 +74,6 @@ export default function App() {
 // Wrapper to handle Admin vs Kiosk view
 function AdminFlow({ user, onLogout }) {
   const [view, setView] = React.useState('admin'); // 'admin' or 'kiosk'
-  const [kioskStatus, setKioskStatus] = React.useState('Ready');
-
-  // Import dynamically or use require if needed, but they are already imported at top
-  // assuming AdminScreen is imported.
-  const AdminScreen = require('./src/screens/AdminScreen').default;
-  // We reuse AttendanceScreen but need to make it Kiosk aware
-  // For now, let's pass a special user object or prop
 
   if (view === 'kiosk') {
     return (
@@ -96,14 +87,8 @@ function AdminFlow({ user, onLogout }) {
 
   return (
     <AdminScreen
-      onBack={onLogout} // Logout from Admin
+      onBack={onLogout}
       onLaunchKiosk={() => setView('kiosk')}
-    // We need to pass the prop onLaunchKiosk to AdminScreen 
-    // but AdminScreen currently uses onBack for everything, let's fix that usage
-    // Actually AdminScreen calls onBack for "Logout" in my previous edit? 
-    // No, "Logout" button calls onBack. 
-    // "Launch Kiosk" button checks onBack too in the previous edit (oops).
-    // I need to fix AdminScreen props.
     />
   );
 }
